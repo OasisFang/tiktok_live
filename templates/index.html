@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TikTok Live Gifts</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+<body>
+    <h1>TikTok Live Gifts</h1>
+    <div id="gift-list">
+        <!-- 礼物信息将显示在这里 -->
+    </div>
+
+    <script>
+        function updateGifts() {
+            $.getJSON("/get_gift_info", function(data) {
+                console.log("收到的礼物信息: ", data);  // 用于调试，确保数据被正确接收
+                let giftList = $("#gift-list");
+                giftList.empty();  // 清空旧的礼物列表
+                data.forEach(function(gift) {
+                    giftList.append("<p>" + gift + "</p>");  // 追加新的礼物信息到列表中
+                });
+            });
+        }
+
+        // 每隔2秒更新一次礼物信息
+        setInterval(updateGifts, 2000);
+    </script>
+</body>
+</html>
