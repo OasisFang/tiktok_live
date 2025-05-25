@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NIKONIKO-GIFT</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background: rgb(240, 230, 240);
+            overflow: hidden;
+        }
+
+        .img {
+            width: 50px;
+            height: 50px;
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            background-image: url('./goat.gif');
+            background-size: cover;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="img"></div>
+</body>
+
+<script>
+    let img = document.querySelector('.img');
+    let windowWidth = window.innerWidth;
+    let imgWidth = img.clientWidth;
+    let posX = windowWidth;
+
+    function moveGoat() {
+        posX -= 0.5; // 每次移动2px
+        img.style.left = posX + 'px';
+
+        // 如果山羊移出屏幕左侧，从右侧重新出现
+        if (posX < -imgWidth) {
+            posX = windowWidth;
+        }
+
+        requestAnimationFrame(moveGoat); // 递归调用，实现持续动画效果
+    }
+
+    moveGoat(); // 开始动画
+</script>
+
+</html>
