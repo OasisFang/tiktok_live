@@ -16,13 +16,13 @@ async def on_connect(event: ConnectEvent):
 @client.on(RoomUserSeqEvent)
 async def on_room_user_seq(event: RoomUserSeqEvent):
     """
-    打印当前推测的“在线人数(total)”和“累计观看(total_user)”
+    Print current estimated "online viewers (total)" and "total views (total_user)"
     """
     data = event.__dict__
     
-    # 从 data 里取出
-    current_viewers = data.get("total")       # 可能是当前在线
-    total_viewers   = data.get("total_user")  # 可能是总观看人次
+    # Extract from data
+    current_viewers = data.get("total")       # Current online viewers
+    total_viewers   = data.get("total_user")  # Total view count
 
     print(
         f"[RoomUserSeqEvent] "
