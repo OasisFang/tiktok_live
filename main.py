@@ -1,29 +1,27 @@
 import logging
-from flask import Flask, render_template, jsonify, send_from_directory
+from flask import Flask, render_template, jsonify, request
 from TikTokLive import TikTokLiveClient
 from TikTokLive.types.events import CommentEvent, GiftEvent, LikeEvent, ShareEvent, FollowEvent
-from pyngrok import ngrok
 import threading
 import json
 from datetime import datetime
 import os
-import requests
 import asyncio
 
-# Create Flask application instance
-app = Flask(__name__, template_folder='templates')
+# 创建Flask应用
+app = Flask(__name__)
 
-# Disable Flask development log output
+# 禁用Flask开发日志输出
 log = logging.getLogger('werkzeug')
 log.setLevel(logging.ERROR)
 
-# Initialize TikTok client
+# 初始化TikTok客户端
 client = TikTokLiveClient(
     unique_id="@username",  # 替换为要监控的用户名
     **({"process_initial_data": True})
 )
 
-# Global variables to store live stream data
+# 全局变量存储直播数据
 stream_data = {
     "current_viewers": 0,
     "total_viewers": 0,
@@ -36,46 +34,16 @@ stream_data = {
     "is_live": False
 }
 
-# Create data directory if it doesn't exist
+# 创建数据目录
 if not os.path.exists('data'):
     os.makedirs('data')
 
 def save_data():
-    """Save stream data to a JSON file"""
+    """保存直播数据到JSON文件"""
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filename = f"data/stream_data_{timestamp}.json"
     with open(filename, 'w', encoding='utf-8') as f:
         json.dump(stream_data, f, ensure_ascii=False, indent=2)
-
-# 更新Web应用数据
-def update_web_data():
-    try:
-        requests.post('http://localhost:5000/update_stream_data', json=stream_data)
-    except Exception as e:
-        print(f"更新Web数据失败: {e}")
-
-# 添加礼物记录
-def add_gift_record(user, gift_name, gift_count):
-    try:
-        gift_data = {
-            'user': user,
-            'gift_name': gift_name,
-            'gift_count': gift_count
-        }
-        requests.post('http://localhost:5000/add_gift', json=gift_data)
-    except Exception as e:
-        print(f"添加礼物记录失败: {e}")
-
-# 添加评论记录
-def add_comment_record(user, comment):
-    try:
-        comment_data = {
-            'user': user,
-            'comment': comment
-        }
-        requests.post('http://localhost:5000/add_comment', json=comment_data)
-    except Exception as e:
-        print(f"添加评论记录失败: {e}")
 
 @client.on("connect")
 async def on_connect(_):
@@ -83,39 +51,33 @@ async def on_connect(_):
     stream_data["start_time"] = datetime.now().isoformat()
     stream_data["is_live"] = True
     save_data()
-    update_web_data()
 
 @client.on("disconnect")
 async def on_disconnect(_):
     print("与直播间断开连接")
     stream_data["is_live"] = False
     save_data()
-    update_web_data()
 
 @client.on("viewer_count")
 async def on_viewer_count(event):
     stream_data["current_viewers"] = event.viewer_count
     stream_data["total_viewers"] += 1
     save_data()
-    update_web_data()
 
 @client.on("like")
 async def on_like(event: LikeEvent):
     stream_data["likes"] += event.like_count
     save_data()
-    update_web_data()
 
 @client.on("share")
 async def on_share(event: ShareEvent):
     stream_data["shares"] += 1
     save_data()
-    update_web_data()
 
 @client.on("follow")
 async def on_follow(event: FollowEvent):
     stream_data["follows"] += 1
     save_data()
-    update_web_data()
 
 @client.on("gift")
 async def on_gift(event: GiftEvent):
@@ -128,8 +90,6 @@ async def on_gift(event: GiftEvent):
     }
     stream_data["gifts"].append(gift_info)
     save_data()
-    add_gift_record(event.user.nickname, event.gift.info.name, event.gift.count)
-    update_web_data()
 
 @client.on("comment")
 async def on_comment(event: CommentEvent):
@@ -140,8 +100,6 @@ async def on_comment(event: CommentEvent):
     }
     stream_data["comments"].append(comment_info)
     save_data()
-    add_comment_record(event.user.nickname, event.comment)
-    update_web_data()
 
 @app.route('/')
 def index():
@@ -149,12 +107,12 @@ def index():
 
 @app.route('/get_stream_data')
 def get_stream_data():
-    """Return current stream data"""
+    """返回当前直播数据"""
     return jsonify(stream_data)
 
 @app.route('/get_summary')
 def get_summary():
-    """Return a summary of the stream data"""
+    """返回直播数据摘要"""
     summary = {
         "current_viewers": stream_data["current_viewers"],
         "total_viewers": stream_data["total_viewers"],
@@ -168,18 +126,13 @@ def get_summary():
     }
     return jsonify(summary)
 
-def start_ngrok():
-    public_url = ngrok.connect(5000)
-    print(f"ngrok public URL: {public_url}")
-
 def start_flask():
     app.run(port=5000)
 
 if __name__ == '__main__':
-    # Start ngrok tunnel and Flask application
-    threading.Thread(target=start_ngrok).start()
+    # 启动Flask应用
     threading.Thread(target=start_flask).start()
     
-    # Set log level and run TikTok client
-    client.logger.setLevel(LogLevel.INFO.value)
-    asyncio.run(client.start())
+    # 设置日志级别并运行TikTok客户端
+    client.logger.setLevel(logging.INFO)
+    asyncio.run(client.start()) 

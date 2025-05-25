@@ -1,140 +1,229 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh">
 
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NIKONIKO</title>
+    <title>TikTok直播数据监控</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
         body {
-            background: rgb(255, 255, 255);
-            overflow: hidden;
-            position: relative;
-            height: 100vh;
-            width: 100vw;
+            background-color: #f8f9fa;
+            padding: 20px;
         }
-
-        .img {
-            width: 200px;
-            height: 200px;
-            position: absolute;
-            background-image: url('/goat.gif');
-            background-size: cover;
+        .stat-card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            transition: transform 0.2s;
         }
-
-        .user-name {
-            position: absolute;
-            top: -30px; /* 调整位置以适应更大的字体 */
-            left: 0;
-            font-size: 24px; /* 增大字体大小 */
-            color: black;
-            white-space: nowrap;
+        .stat-card:hover {
+            transform: translateY(-5px);
+        }
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #0d6efd;
+        }
+        .stat-label {
+            color: #6c757d;
+            font-size: 14px;
+        }
+        .live-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 5px;
+        }
+        .live {
+            background-color: #28a745;
+            box-shadow: 0 0 10px #28a745;
+        }
+        .offline {
+            background-color: #dc3545;
+        }
+        .activity-card {
+            background: white;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .activity-list {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .activity-item {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        .activity-item:last-child {
+            border-bottom: none;
+        }
+        .timestamp {
+            font-size: 12px;
+            color: #6c757d;
         }
     </style>
 </head>
 
 <body>
-  <script>
-      let lastGift = ""; // 记录最后处理过的礼物信息
-      let giftQueue = []; // 用于存储礼物信息的队列
-      let isAnimating = false; // 标记当前是否有动画正在进行
-      let pageVisible = true; // 用于检测页面是否可见
+    <div class="container">
+        <h1 class="mb-4">
+            <span id="status-indicator" class="live-indicator"></span>
+            TikTok直播数据监控
+        </h1>
+        
+        <div class="row">
+            <!-- 观看数据 -->
+            <div class="col-md-4">
+                <div class="stat-card">
+                    <div class="stat-value" id="current-viewers">0</div>
+                    <div class="stat-label">当前观看人数</div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="stat-card">
+                    <div class="stat-value" id="total-viewers">0</div>
+                    <div class="stat-label">总观看人次</div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="stat-card">
+                    <div class="stat-value" id="stream-duration">00:00:00</div>
+                    <div class="stat-label">直播时长</div>
+                </div>
+            </div>
+        </div>
 
-      // 监听页面可见性切换事件
-      document.addEventListener("visibilitychange", () => {
-          pageVisible = !document.hidden;
-          if (pageVisible && !isAnimating && giftQueue.length > 0) {
-              processGiftQueue();
-          }
-      });
+        <div class="row mt-4">
+            <!-- 互动数据 -->
+            <div class="col-md-3">
+                <div class="stat-card">
+                    <div class="stat-value" id="total-likes">0</div>
+                    <div class="stat-label">总点赞数</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-card">
+                    <div class="stat-value" id="total-shares">0</div>
+                    <div class="stat-label">总分享数</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-card">
+                    <div class="stat-value" id="total-follows">0</div>
+                    <div class="stat-label">总关注数</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-card">
+                    <div class="stat-value" id="total-gifts">0</div>
+                    <div class="stat-label">总礼物数</div>
+                </div>
+            </div>
+        </div>
 
-      // 从服务器获取最新礼物信息
-      async function fetchGiftInfo() {
-          const response = await fetch('/get_gift_info');
-          const data = await response.json();
-          
-          if (data.user && `${data.user} 送出了 ${data.gift}` !== lastGift) {
-              // 获取礼物的数量信息
-              let giftCount = data.repeat_count || 1; // 默认生成1只小羊
-              
-              // 根据礼物数量多次生成小羊动画
-              for (let i = 0; i < giftCount; i++) {
-                  giftQueue.push({
-                      user: data.user,
-                      gift: data.gift // 保留礼物名称
-                  });
-              }
+        <div class="row mt-4">
+            <!-- 最近活动 -->
+            <div class="col-md-6">
+                <div class="activity-card">
+                    <h5 class="mb-3">最近礼物</h5>
+                    <div class="activity-list" id="gift-list">
+                        <!-- 礼物记录将在这里显示 -->
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="activity-card">
+                    <h5 class="mb-3">最近评论</h5>
+                    <div class="activity-list" id="comment-list">
+                        <!-- 评论记录将在这里显示 -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
-              lastGift = `${data.user} 送出了 ${data.gift}`;
-              // 如果当前没有正在进行的动画，并且页面是可见的，开始处理队列中的礼物
-              if (!isAnimating && pageVisible) {
-                  processGiftQueue();
-              }
-          }
-      }
+    <script>
+        function updateStats(data) {
+            // 更新观看数据
+            document.getElementById('current-viewers').textContent = data.current_viewers;
+            document.getElementById('total-viewers').textContent = data.total_viewers;
+            
+            // 更新互动数据
+            document.getElementById('total-likes').textContent = data.total_likes;
+            document.getElementById('total-shares').textContent = data.total_shares;
+            document.getElementById('total-follows').textContent = data.total_follows;
+            document.getElementById('total-gifts').textContent = data.total_gifts;
 
-      // 处理礼物队列中的礼物
-      function processGiftQueue() {
-          if (giftQueue.length > 0 && !isAnimating) {
-              isAnimating = true; // 标记动画进行中
-              const giftData = giftQueue.shift(); // 取出队列中的第一个礼物信息
-              createGoat(giftData, () => {
-                  // 当前礼物动画结束后，继续处理下一个礼物
-                  isAnimating = false;
-                  processGiftQueue();
-              });
-          }
-      }
+            // 更新直播状态
+            const indicator = document.getElementById('status-indicator');
+            indicator.className = `live-indicator ${data.is_live ? 'live' : 'offline'}`;
 
-      // 生成小羊动画
-      function createGoat(giftData, callback) {
-          const img = document.createElement('div');
-          img.className = 'img';
-          img.style.left = window.innerWidth + 'px'; // 从屏幕右侧开始位置
-          img.style.top = '50%'; // 垂直居中
+            // 更新直播时长
+            if (data.start_time) {
+                const start = new Date(data.start_time);
+                const now = new Date();
+                const duration = Math.floor((now - start) / 1000);
+                const hours = Math.floor(duration / 3600);
+                const minutes = Math.floor((duration % 3600) / 60);
+                const seconds = duration % 60;
+                document.getElementById('stream-duration').textContent = 
+                    `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            }
+        }
 
-          const userName = document.createElement('div');
-          userName.className = 'user-name';
-          userName.textContent = `${giftData.user}`;
+        function updateGiftList(gifts) {
+            const giftList = document.getElementById('gift-list');
+            giftList.innerHTML = '';
+            gifts.slice(-10).forEach(gift => {
+                const div = document.createElement('div');
+                div.className = 'activity-item';
+                div.innerHTML = `
+                    <div><strong>${gift.user}</strong> 送出了 ${gift.gift_count}个 ${gift.gift_name}</div>
+                    <div class="timestamp">${new Date(gift.timestamp).toLocaleString()}</div>
+                `;
+                giftList.appendChild(div);
+            });
+        }
 
-          img.appendChild(userName);
-          document.body.appendChild(img);
+        function updateCommentList(comments) {
+            const commentList = document.getElementById('comment-list');
+            commentList.innerHTML = '';
+            comments.slice(-10).forEach(comment => {
+                const div = document.createElement('div');
+                div.className = 'activity-item';
+                div.innerHTML = `
+                    <div><strong>${comment.user}</strong>: ${comment.comment}</div>
+                    <div class="timestamp">${new Date(comment.timestamp).toLocaleString()}</div>
+                `;
+                commentList.appendChild(div);
+            });
+        }
 
-          let posX = window.innerWidth;
-          const moveSpeed = 0.5; // 每次移动的像素数
-          let hasGeneratedNext = false; // 用来标记是否已经生成了下一个礼物
+        function fetchData() {
+            fetch('/get_summary')
+                .then(response => response.json())
+                .then(data => {
+                    updateStats(data);
+                });
 
-          function moveGoat() {
-              posX -= moveSpeed;
-              img.style.left = posX + 'px';
+            fetch('/get_stream_data')
+                .then(response => response.json())
+                .then(data => {
+                    updateGiftList(data.gifts);
+                    updateCommentList(data.comments);
+                });
+        }
 
-              // 如果小羊的右侧完全进入屏幕，生成下一个小羊，且留出5px的空隙
-              if (!hasGeneratedNext && posX <= window.innerWidth - img.clientWidth - 5) {
-                  hasGeneratedNext = true;
-                  if (callback) callback(); // 动画还没结束，但生成下一个礼物
-              }
-
-              // 移出屏幕后删除元素
-              if (posX < -img.clientWidth) {
-                  img.remove();
-              } else {
-                  requestAnimationFrame(moveGoat); // 继续移动
-              }
-          }
-
-          moveGoat();
-      }
-
-      // 每秒检查一次礼物信息
-      setInterval(fetchGiftInfo, 1000);
-  </script>
+        // 每秒更新一次数据
+        setInterval(fetchData, 1000);
+        fetchData(); // 初始加载
+    </script>
 </body>
 
 </html>
