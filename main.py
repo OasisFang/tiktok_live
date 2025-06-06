@@ -1,138 +1,136 @@
-import logging
-from flask import Flask, render_template, jsonify, request
-from TikTokLive import TikTokLiveClient
-from TikTokLive.types.events import CommentEvent, GiftEvent, LikeEvent, ShareEvent, FollowEvent
+import subprocess
+import sys
 import threading
-import json
-from datetime import datetime
+import signal
 import os
-import asyncio
+from flask import Flask, render_template, jsonify, request
+from datetime import datetime
 
-# 创建Flask应用
 app = Flask(__name__)
-
-# 禁用Flask开发日志输出
-log = logging.getLogger('werkzeug')
-log.setLevel(logging.ERROR)
-
-# 初始化TikTok客户端
-client = TikTokLiveClient(
-    unique_id="@username",  # 替换为要监控的用户名
-    **({"process_initial_data": True})
-)
 
 # 全局变量存储直播数据
 stream_data = {
-    "current_viewers": 0,
-    "total_viewers": 0,
-    "gifts": [],
-    "comments": [],
-    "likes": 0,
-    "shares": 0,
-    "follows": 0,
-    "start_time": None,
-    "is_live": False
+    'current_viewers': 0,
+    'total_viewers': 0,
+    'total_likes': 0,
+    'total_shares': 0,
+    'total_follows': 0,
+    'total_gifts': 0,
+    'is_live': False,
+    'start_time': None,
+    'gifts': [],
+    'comments': [],
+    'room_info': {}  # 添加房间信息
 }
-
-# 创建数据目录
-if not os.path.exists('data'):
-    os.makedirs('data')
-
-def save_data():
-    """保存直播数据到JSON文件"""
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"data/stream_data_{timestamp}.json"
-    with open(filename, 'w', encoding='utf-8') as f:
-        json.dump(stream_data, f, ensure_ascii=False, indent=2)
-
-@client.on("connect")
-async def on_connect(_):
-    print("已连接到直播间")
-    stream_data["start_time"] = datetime.now().isoformat()
-    stream_data["is_live"] = True
-    save_data()
-
-@client.on("disconnect")
-async def on_disconnect(_):
-    print("与直播间断开连接")
-    stream_data["is_live"] = False
-    save_data()
-
-@client.on("viewer_count")
-async def on_viewer_count(event):
-    stream_data["current_viewers"] = event.viewer_count
-    stream_data["total_viewers"] += 1
-    save_data()
-
-@client.on("like")
-async def on_like(event: LikeEvent):
-    stream_data["likes"] += event.like_count
-    save_data()
-
-@client.on("share")
-async def on_share(event: ShareEvent):
-    stream_data["shares"] += 1
-    save_data()
-
-@client.on("follow")
-async def on_follow(event: FollowEvent):
-    stream_data["follows"] += 1
-    save_data()
-
-@client.on("gift")
-async def on_gift(event: GiftEvent):
-    gift_info = {
-        "user": event.user.nickname,
-        "gift_name": event.gift.info.name,
-        "gift_count": event.gift.count,
-        "gift_value": event.gift.diamond_count,
-        "timestamp": datetime.now().isoformat()
-    }
-    stream_data["gifts"].append(gift_info)
-    save_data()
-
-@client.on("comment")
-async def on_comment(event: CommentEvent):
-    comment_info = {
-        "user": event.user.nickname,
-        "comment": event.comment,
-        "timestamp": datetime.now().isoformat()
-    }
-    stream_data["comments"].append(comment_info)
-    save_data()
+monitor_proc = None
 
 @app.route('/')
 def index():
     return render_template('index.html')
 
-@app.route('/get_stream_data')
-def get_stream_data():
-    """返回当前直播数据"""
-    return jsonify(stream_data)
-
 @app.route('/get_summary')
 def get_summary():
-    """返回直播数据摘要"""
-    summary = {
-        "current_viewers": stream_data["current_viewers"],
-        "total_viewers": stream_data["total_viewers"],
-        "total_gifts": len(stream_data["gifts"]),
-        "total_comments": len(stream_data["comments"]),
-        "total_likes": stream_data["likes"],
-        "total_shares": stream_data["shares"],
-        "total_follows": stream_data["follows"],
-        "is_live": stream_data["is_live"],
-        "start_time": stream_data["start_time"]
-    }
-    return jsonify(summary)
+    return jsonify({
+        'current_viewers': stream_data['current_viewers'],
+        'total_viewers': stream_data['total_viewers'],
+        'total_likes': stream_data['total_likes'],
+        'total_shares': stream_data['total_shares'],
+        'total_follows': stream_data['total_follows'],
+        'total_gifts': stream_data['total_gifts'],
+        'is_live': stream_data['is_live'],
+        'start_time': stream_data['start_time'],
+        'room_info': stream_data['room_info']  # 添加房间信息
+    })
 
-def start_flask():
-    app.run(port=5000)
+@app.route('/get_stream_data')
+def get_stream_data():
+    return jsonify({
+        'gifts': stream_data['gifts'],
+        'comments': stream_data['comments']
+    })
+
+@app.route('/update_stream_data', methods=['POST'])
+def update_stream_data():
+    data = request.json
+    for key in ['current_viewers', 'total_viewers', 'total_likes', 'total_shares', 
+                'total_follows', 'total_gifts', 'is_live', 'start_time', 'room_info']:
+        if key in data:
+            stream_data[key] = data[key]
+    return jsonify({'status': 'success'})
+
+@app.route('/add_gift', methods=['POST'])
+def add_gift():
+    gift_data = request.json
+    stream_data['gifts'].append({
+        'user': gift_data['user'],
+        'gift_name': gift_data['gift_name'],
+        'gift_count': gift_data['gift_count'],
+        'timestamp': datetime.now().isoformat()
+    })
+    stream_data['total_gifts'] += gift_data.get('gift_count', 1)
+    if len(stream_data['gifts']) > 100:
+        stream_data['gifts'] = stream_data['gifts'][-100:]
+    return jsonify({'status': 'success'})
+
+@app.route('/add_comment', methods=['POST'])
+def add_comment():
+    comment_data = request.json
+    stream_data['comments'].append({
+        'user': comment_data['user'],
+        'comment': comment_data['comment'],
+        'timestamp': datetime.now().isoformat()
+    })
+    if len(stream_data['comments']) > 100:
+        stream_data['comments'] = stream_data['comments'][-100:]
+    return jsonify({'status': 'success'})
+
+@app.route('/start_monitor', methods=['POST'])
+def start_monitor():
+    global monitor_proc
+    data = request.json
+    room_id = data.get('room_id')
+    if not room_id:
+        return jsonify({'status': 'error', 'message': '缺少房间ID参数'}), 400
+    
+    # 停止已有监控进程
+    stop_monitor_process()
+    
+    # 启动新的监控进程
+    monitor_proc = subprocess.Popen([sys.executable, 'monitor.py', room_id])
+    print(f"已启动子进程监控房间: {room_id}，进程ID: {monitor_proc.pid}")
+    
+    return jsonify({'status': 'success'})
+
+@app.route('/stop_monitor', methods=['POST'])
+def stop_monitor():
+    """停止当前监控进程"""
+    if stop_monitor_process():
+        return jsonify({'status': 'success', 'message': '监控已停止'})
+    return jsonify({'status': 'success', 'message': '没有正在运行的监控'})
+
+def stop_monitor_process():
+    """停止监控进程的辅助函数"""
+    global monitor_proc
+    if monitor_proc and monitor_proc.poll() is None:
+        # 在Windows上使用taskkill，在Unix上使用kill
+        try:
+            if os.name == 'nt':  # Windows
+                subprocess.call(['taskkill', '/F', '/T', '/PID', str(monitor_proc.pid)])
+            else:  # Unix
+                os.kill(monitor_proc.pid, signal.SIGTERM)
+            monitor_proc.wait(timeout=5)  # 等待进程结束
+            print(f"已终止监控进程 {monitor_proc.pid}")
+        except Exception as e:
+            print(f"终止进程失败: {e}")
+        monitor_proc = None
+        return True
+    return False
 
 if __name__ == '__main__':
-    # 启动Flask应用
-    threading.Thread(target=start_flask).start()
+    # 确保程序退出时关闭子进程
+    import atexit
+    atexit.register(stop_monitor_process)
     
-    # 设置日志级别并运行TikTok客户端
-    client.logger.setLevel(logging.INFO)
-    asyncio.run(client.start()) 
+    # 正常启动网页服务
+    print("启动 TikTok Live 监控服务，请访问 http://localhost:5000/")
+    app.run(debug=True) 

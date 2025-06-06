@@ -3,177 +3,280 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TikTok直播数据监控</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body {
-            background-color: #f8f9fa;
+            font-family: 'Arial', sans-serif;
+            margin: 0;
             padding: 20px;
+            background-color: #f8f8f8;
+            color: #333;
         }
-        .stat-card {
-            background: white;
-            border-radius: 10px;
-            padding: 20px;
+        h1 {
+            color: #fe2c55;
+            text-align: center;
             margin-bottom: 20px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            transition: transform 0.2s;
         }
-        .stat-card:hover {
-            transform: translateY(-5px);
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-gap: 20px;
         }
-        .stat-value {
+        .panel {
+            background: white;
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        .full-width {
+            grid-column: span 2;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            grid-gap: 10px;
+        }
+        .stat-item {
+            background: #f4f4f4;
+            padding: 10px 15px;
+            border-radius: 6px;
+        }
+        .stat-number {
             font-size: 24px;
             font-weight: bold;
-            color: #0d6efd;
+            color: #fe2c55;
+            display: block;
+            margin-top: 5px;
         }
-        .stat-label {
-            color: #6c757d;
-            font-size: 14px;
-        }
-        .live-indicator {
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            display: inline-block;
-            margin-right: 5px;
-        }
-        .live {
-            background-color: #28a745;
-            box-shadow: 0 0 10px #28a745;
-        }
-        .offline {
-            background-color: #dc3545;
-        }
-        .activity-card {
-            background: white;
-            border-radius: 10px;
-            padding: 15px;
+        #monitor-form {
             margin-bottom: 20px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            display: flex;
         }
-        .activity-list {
+        #room-id-input {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px 0 0 4px;
+            font-size: 16px;
+        }
+        button {
+            background-color: #fe2c55;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 0 4px 4px 0;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button.stop {
+            background-color: #888;
+            border-radius: 4px;
+            margin-left: 10px;
+        }
+        ul {
+            list-style-type: none;
+            padding: 0;
             max-height: 300px;
             overflow-y: auto;
         }
-        .activity-item {
+        li {
             padding: 10px;
             border-bottom: 1px solid #eee;
         }
-        .activity-item:last-child {
-            border-bottom: none;
+        .message {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
         }
-        .timestamp {
-            font-size: 12px;
-            color: #6c757d;
+        .room-info {
+            display: flex;
+            align-items: center;
+        }
+        .avatar {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            margin-right: 15px;
+            object-fit: cover;
+        }
+        .room-details {
+            flex: 1;
+        }
+        .room-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .host-name {
+            color: #777;
         }
     </style>
 </head>
 
 <body>
+    <h1>TikTok直播数据监控</h1>
     <div class="container">
-        <h1 class="mb-4">
-            <span id="status-indicator" class="live-indicator"></span>
-            TikTok直播数据监控
-        </h1>
-        
-        <div class="row">
-            <!-- 观看数据 -->
-            <div class="col-md-4">
-                <div class="stat-card">
-                    <div class="stat-value" id="current-viewers">0</div>
-                    <div class="stat-label">当前观看人数</div>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="stat-card">
-                    <div class="stat-value" id="total-viewers">0</div>
-                    <div class="stat-label">总观看人次</div>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="stat-card">
-                    <div class="stat-value" id="stream-duration">00:00:00</div>
-                    <div class="stat-label">直播时长</div>
+        <div class="panel full-width">
+            <form id="monitor-form">
+                <input type="text" id="room-id-input" placeholder="输入TikTok用户名（例如：nikonikodiy，无需@符号）">
+                <button type="submit">开始监控</button>
+                <button type="button" class="stop" id="stop-btn">停止监控</button>
+            </form>
+            <div id="message" class="message" style="color: #d00;"></div>
+        </div>
+
+        <div class="panel">
+            <h2>直播房间信息</h2>
+            <div id="room-info" class="room-info">
+                <img id="avatar" src="" class="avatar" style="display: none;">
+                <div class="room-details">
+                    <div><b>房间ID：</b><span id="room-id">-</span></div>
+                    <div class="room-title" id="room-title">未连接到直播间</div>
+                    <div class="host-name" id="host-name"></div>
+                    <div>状态：<span id="is-live">离线</span></div>
+                    <div>开始时间：<span id="start-time"></span></div>
                 </div>
             </div>
         </div>
 
-        <div class="row mt-4">
-            <!-- 互动数据 -->
-            <div class="col-md-3">
-                <div class="stat-card">
-                    <div class="stat-value" id="total-likes">0</div>
-                    <div class="stat-label">总点赞数</div>
+        <div class="panel">
+            <h2>统计数据</h2>
+            <div class="stats">
+                <div class="stat-item">
+                    当前观看人数
+                    <span id="current-viewers" class="stat-number">0</span>
                 </div>
-            </div>
-            <div class="col-md-3">
-                <div class="stat-card">
-                    <div class="stat-value" id="total-shares">0</div>
-                    <div class="stat-label">总分享数</div>
+                <div class="stat-item">
+                    总观看人次
+                    <span id="total-viewers" class="stat-number">0</span>
                 </div>
-            </div>
-            <div class="col-md-3">
-                <div class="stat-card">
-                    <div class="stat-value" id="total-follows">0</div>
-                    <div class="stat-label">总关注数</div>
+                <div class="stat-item">
+                    总点赞数
+                    <span id="total-likes" class="stat-number">0</span>
                 </div>
-            </div>
-            <div class="col-md-3">
-                <div class="stat-card">
-                    <div class="stat-value" id="total-gifts">0</div>
-                    <div class="stat-label">总礼物数</div>
+                <div class="stat-item">
+                    总分享数
+                    <span id="total-shares" class="stat-number">0</span>
+                </div>
+                <div class="stat-item">
+                    总关注数
+                    <span id="total-follows" class="stat-number">0</span>
+                </div>
+                <div class="stat-item">
+                    总礼物数
+                    <span id="total-gifts" class="stat-number">0</span>
                 </div>
             </div>
         </div>
 
-        <div class="row mt-4">
-            <!-- 最近活动 -->
-            <div class="col-md-6">
-                <div class="activity-card">
-                    <h5 class="mb-3">最近礼物</h5>
-                    <div class="activity-list" id="gift-list">
-                        <!-- 礼物记录将在这里显示 -->
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-6">
-                <div class="activity-card">
-                    <h5 class="mb-3">最近评论</h5>
-                    <div class="activity-list" id="comment-list">
-                        <!-- 评论记录将在这里显示 -->
-                    </div>
-                </div>
-            </div>
+        <div class="panel full-width">
+            <h2>观看人数趋势</h2>
+            <canvas id="viewersChart" width="600" height="200"></canvas>
+        </div>
+
+        <div class="panel">
+            <h2>最近礼物</h2>
+            <ul id="gift-list"></ul>
+        </div>
+
+        <div class="panel">
+            <h2>最近评论</h2>
+            <ul id="comment-list"></ul>
         </div>
     </div>
 
     <script>
+        // 当前房间ID
+        let currentRoomId = null;
+        
+        // 启动监控
+        document.getElementById('monitor-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const roomId = document.getElementById('room-id-input').value.trim();
+            if (!roomId) {
+                document.getElementById('message').textContent = '请输入房间ID';
+                return;
+            }
+            
+            // 记录当前房间ID
+            currentRoomId = roomId;
+            fetch('/start_monitor', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ room_id: roomId })
+            })
+            .then(response => response.json())
+            .then(data => {
+                const msgEl = document.getElementById('message');
+                if (data.status === 'success') {
+                    msgEl.textContent = '正在连接房间: ' + roomId;
+                    msgEl.style.color = '#007bff';
+                } else {
+                    msgEl.textContent = '错误：' + data.message;
+                    msgEl.style.color = '#d00';
+                }
+            })
+            .catch(_ => {
+                document.getElementById('message').textContent = '请求失败，请稍后重试';
+                document.getElementById('message').style.color = '#d00';
+            });
+        });
+        
+        // 停止监控
+        document.getElementById('stop-btn').addEventListener('click', function() {
+            fetch('/stop_monitor', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('message').textContent = data.message;
+                document.getElementById('message').style.color = '#28a745';
+                currentRoomId = null;
+            });
+        });
+
         function updateStats(data) {
-            // 更新观看数据
             document.getElementById('current-viewers').textContent = data.current_viewers;
             document.getElementById('total-viewers').textContent = data.total_viewers;
-            
-            // 更新互动数据
             document.getElementById('total-likes').textContent = data.total_likes;
             document.getElementById('total-shares').textContent = data.total_shares;
             document.getElementById('total-follows').textContent = data.total_follows;
             document.getElementById('total-gifts').textContent = data.total_gifts;
-
-            // 更新直播状态
-            const indicator = document.getElementById('status-indicator');
-            indicator.className = `live-indicator ${data.is_live ? 'live' : 'offline'}`;
-
-            // 更新直播时长
+            document.getElementById('is-live').textContent = data.is_live ? '在线' : '离线';
+            document.getElementById('is-live').style.color = data.is_live ? '#28a745' : '#d00';
+            
             if (data.start_time) {
-                const start = new Date(data.start_time);
-                const now = new Date();
-                const duration = Math.floor((now - start) / 1000);
-                const hours = Math.floor(duration / 3600);
-                const minutes = Math.floor((duration % 3600) / 60);
-                const seconds = duration % 60;
-                document.getElementById('stream-duration').textContent = 
-                    `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                const startTime = new Date(data.start_time);
+                document.getElementById('start-time').textContent = startTime.toLocaleString();
+            }
+            
+            // 更新房间信息
+            if (data.room_info && Object.keys(data.room_info).length > 0) {
+                document.getElementById('room-id').textContent = data.room_info.room_id || '-';
+                
+                if (data.room_info.room_title) {
+                    document.getElementById('room-title').textContent = data.room_info.room_title;
+                }
+                
+                if (data.room_info.host_name) {
+                    document.getElementById('host-name').textContent = data.room_info.host_name;
+                }
+                
+                if (data.room_info.avatar_url) {
+                    const avatarEl = document.getElementById('avatar');
+                    avatarEl.src = data.room_info.avatar_url;
+                    avatarEl.style.display = 'block';
+                }
+            }
+            
+            // 根据 is_live 更新连接状态
+            if (data.is_live && currentRoomId) {
+                document.getElementById('message').textContent = '房间 ' + currentRoomId + ' 已连接';
+                document.getElementById('message').style.color = '#28a745';
             }
         }
 
@@ -181,13 +284,9 @@
             const giftList = document.getElementById('gift-list');
             giftList.innerHTML = '';
             gifts.slice(-10).forEach(gift => {
-                const div = document.createElement('div');
-                div.className = 'activity-item';
-                div.innerHTML = `
-                    <div><strong>${gift.user}</strong> 送出了 ${gift.gift_count}个 ${gift.gift_name}</div>
-                    <div class="timestamp">${new Date(gift.timestamp).toLocaleString()}</div>
-                `;
-                giftList.appendChild(div);
+                const li = document.createElement('li');
+                li.textContent = `${gift.user} 送出 ${gift.gift_count} 个 ${gift.gift_name} (${new Date(gift.timestamp).toLocaleString()})`;
+                giftList.appendChild(li);
             });
         }
 
@@ -195,13 +294,9 @@
             const commentList = document.getElementById('comment-list');
             commentList.innerHTML = '';
             comments.slice(-10).forEach(comment => {
-                const div = document.createElement('div');
-                div.className = 'activity-item';
-                div.innerHTML = `
-                    <div><strong>${comment.user}</strong>: ${comment.comment}</div>
-                    <div class="timestamp">${new Date(comment.timestamp).toLocaleString()}</div>
-                `;
-                commentList.appendChild(div);
+                const li = document.createElement('li');
+                li.textContent = `${comment.user}: ${comment.comment} (${new Date(comment.timestamp).toLocaleString()})`;
+                commentList.appendChild(li);
             });
         }
 
@@ -210,6 +305,14 @@
                 .then(response => response.json())
                 .then(data => {
                     updateStats(data);
+                    const now = new Date().toLocaleTimeString();
+                    viewersChart.data.labels.push(now);
+                    viewersChart.data.datasets[0].data.push(data.current_viewers);
+                    if (viewersChart.data.labels.length > 20) {
+                        viewersChart.data.labels.shift();
+                        viewersChart.data.datasets[0].data.shift();
+                    }
+                    viewersChart.update();
                 });
 
             fetch('/get_stream_data')
@@ -220,9 +323,38 @@
                 });
         }
 
-        // 每秒更新一次数据
+        // Chart.js 初始化
+        const ctx = document.getElementById('viewersChart').getContext('2d');
+        const viewersChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: '当前观看人数',
+                    data: [],
+                    fill: false,
+                    borderColor: '#fe2c55',
+                    tension: 0.1
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    x: {
+                        display: true,
+                        title: { display: true, text: '时间' }
+                    },
+                    y: {
+                        display: true,
+                        title: { display: true, text: '人数' },
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+        
         setInterval(fetchData, 1000);
-        fetchData(); // 初始加载
+        fetchData();
     </script>
 </body>
 
